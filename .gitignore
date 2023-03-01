@@ -1,5 +1,9 @@
 /images
 !/images/.keep
+/refine_targets
+!/refine_targets/.keep
+/refines
+!/refines/.keep
 
 # --- default
 
