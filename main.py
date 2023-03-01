@@ -1,32 +1,91 @@
 from datetime import datetime
-from diffusers import StableDiffusionPipeline
+from diffusers import StableDiffusionPipeline, DPMSolverMultistepScheduler
 import torch
 
-pipeline = StableDiffusionPipeline.from_pretrained(
-    "gsdf/Counterfeit-V2.5",
-    torch_dtype=torch.float16
-    ).to("mps")
+prompt = ",".join([
+  "1girl"
+])
+negative_prompt = ",".join([
+  "worst quality",
+  "low quality",
+  "jpeg artifacts",
+  "deformed",
+  "bad anatomy",
+  "disfigured",
+  "mutation",
+  "mutated",
+  "extra limbs",
+  "ugly",
+  "fat",
+  "missing limb",
+  "floating limbs",
+  "disconnected limbs",
+  "long neck",
+  "long body",
+  "part of the head",
+  "mutated hands and fingers",
+  "intricate human hands fingers",
+  "poorly drawn hands",
+  "malformed hands",
+  "poorly drawn face",
+  "poorly drawn asymmetrical eyes",
+  "low contrast",
+  "cmyk",
+  "greyscale",
+  "flat color",
+  "comic",
+  "manga",
+  "split screen",
+  "monochrome",
+  "dusty sunbeams",
+  "text",
+  "title",
+  "logo",
+  "signature",
+  "animal",
+  "furry",
+])
+
+model_name = "gsdf/Counterfeit-V2.5"
+outputs_directory = "./images"
+# 実行回数
+number_of_attempts = 100
+device = "mps"
+num_images_per_prompt = 1
+height = 864
+width = 512
+num_inference_steps = 50
+guidance_scale = 15
+
+pipeline = StableDiffusionPipeline.from_pretrained(model_name, torch_dtype=torch.float16).to(device)
+# pipeline.scheduler = EulerDiscreteScheduler.from_config(pipeline.scheduler.config)
+pipeline.scheduler = DPMSolverMultistepScheduler.from_config(pipeline.scheduler.config)
 
 # Recommended if your computer has < 64 GB of RAM
 # pipe.enable_attention_slicing()
 
-prompt = """
-((masterpiece,best quality)), 1girl, food, fruit, solo, skirt, shop, indoors, jacket, shopping, basket, jewelry, shirt, shelf, short hair, black hair, plaid skirt, black jacket, dutch angle, yellow eyes, looking at viewer
-Negative prompt: EasyNegative, extra fingers,fewer fingers,
-Steps: 20, Sampler: DPM++ 2M Karras, CFG scale: 10, Size: 864x512, Denoising strength: 0.58, Hires upscale: 1.8, Hires upscaler: Latent
-"""
-
 # First-time "warmup" pass (see explanation above)
 _ = pipeline(prompt, num_inference_steps=1)
 
-# Results match those from the CPU device after the warmup pass.
-images = pipeline(prompt, num_inference_steps=50).images
-now = datetime.now()
-for idx, image in enumerate(images):
-    file_name = str(now.year) \
-      + str(now.month).zfill(2) \
-      + str(now.day).zfill(2) \
-      + "-" + str(now.hour).zfill(2) \
-      + str(now.minute).zfill(2) \
-      + "-" + str(idx)
-    image.save(f"images/{file_name}.png")
+i = 1
+for _ in range(number_of_attempts):
+    print(f"ℹ️ Creating image... ({i}/{number_of_attempts})")
+
+    # Results match those from the CPU device after the warmup pass.
+    images = pipeline(
+        prompt,
+        negative_prompt=negative_prompt,
+        height=height,
+        width=width,
+        num_inference_steps=num_inference_steps,
+        guidance_scale=guidance_scale,
+        num_images_per_prompt=num_images_per_prompt,
+    ).images
+
+    for _, image in enumerate(images):
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        file_path = f"{outputs_directory}/{timestamp}-{i}.png"
+        image.save(file_path)
+        i += 1
+
+    print(f"🎉 Created {file_path}")
